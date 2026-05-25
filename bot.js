@@ -9,61 +9,128 @@ const { broadcast } = require('./ws');
 const exchange = new ccxt.bybit({
     apiKey: process.env.API_KEY,
     secret: process.env.API_SECRET,
+
     enableRateLimit: true,
+
     options: {
-        adjustForTimeDifference: true
+        defaultType: 'spot',
+        adjustForTimeDifference: false
     }
 });
 
-const symbol = 'BTC/USDT';
+// ======================
+// EVITA CHAMADAS PRIVADAS
+// ======================
+
+exchange.loadMarkets = async () => { };
+
+const symbol = 'BTCUSDT';
 
 let position = null;
 let prices = [];
+
+// ======================
+// BOT LOOP
+// ======================
 
 async function bot() {
 
     try {
 
-        const ticker = await exchange.fetchTicker(symbol);
-        const price = ticker.last;
+        // ======================
+        // TICKER PUBLICO V5
+        // ======================
+
+        const ticker =
+            await exchange.publicGetV5MarketTickers({
+                category: 'spot',
+                symbol
+            });
+
+        const price =
+            parseFloat(
+                ticker.result.list[0].lastPrice
+            );
+
+        // ======================
+        // HISTORICO
+        // ======================
 
         prices.push(price);
-        if (prices.length > 50) prices.shift();
+
+        if (prices.length > 50) {
+            prices.shift();
+        }
+
+        // ======================
+        // IA
+        // ======================
 
         const decision = aiDecision(prices);
 
         let action = "WAITING";
         let profit = 0;
 
+        // ======================
+        // BUY
+        // ======================
+
         if (!position && decision === "BUY") {
 
-            position = { entryPrice: price };
+            position = {
+                entryPrice: price
+            };
+
             action = "BUY";
 
             console.log("BUY", price);
         }
 
+        // ======================
+        // POSITION
+        // ======================
+
         if (position) {
 
-            profit = price - position.entryPrice;
+            profit =
+                price - position.entryPrice;
 
-            const tp = calcTP(position.entryPrice);
-            const sl = calcSL(position.entryPrice);
+            const tp =
+                calcTP(position.entryPrice);
+
+            const sl =
+                calcSL(position.entryPrice);
+
+            // ======================
+            // TAKE PROFIT
+            // ======================
 
             if (price >= tp) {
 
                 action = "SELL_TP";
+
                 console.log("TAKE PROFIT");
+
                 position = null;
             }
+
+            // ======================
+            // STOP LOSS
+            // ======================
 
             else if (price <= sl) {
 
                 action = "SELL_SL";
+
                 console.log("STOP LOSS");
+
                 position = null;
             }
         }
+
+        // ======================
+        // SEND FRONTEND
+        // ======================
 
         broadcast({
             price,
@@ -81,9 +148,17 @@ async function bot() {
         });
 
     } catch (err) {
-        console.log("BOT ERROR:", err.message);
+
+        console.log(
+            "BOT ERROR:",
+            err.message
+        );
     }
 }
+
+// ======================
+// START LOOP
+// ======================
 
 setInterval(bot, 2000);
 
