@@ -72,5 +72,5 @@ app.get('/status', (req, res) => {
 app.listen(3001, () => {
 
     console.log("API ON 3001");
-    console.log("WS ON 8080");
+    console.log("WS ON");
 });
