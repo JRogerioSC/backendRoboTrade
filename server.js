@@ -3,9 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const { broadcast, createWSS } = require('./ws');
 require('./bot');
-
-const { broadcast } = require('./ws');
 
 const app = express();
 
@@ -17,7 +16,6 @@ let botStatus = "OFF";
 // ======================
 // START BOT
 // ======================
-
 app.post('/start', (req, res) => {
 
     botStatus = "ON";
@@ -37,7 +35,6 @@ app.post('/start', (req, res) => {
 // ======================
 // STOP BOT
 // ======================
-
 app.post('/stop', (req, res) => {
 
     botStatus = "OFF";
@@ -57,20 +54,19 @@ app.post('/stop', (req, res) => {
 // ======================
 // STATUS
 // ======================
-
 app.get('/status', (req, res) => {
-
-    res.json({
-        status: botStatus
-    });
+    res.json({ status: botStatus });
 });
 
 // ======================
-// SERVER
+// START SERVER + WS
 // ======================
-
-app.listen(3001, () => {
+const server = app.listen(3001, () => {
 
     console.log("API ON 3001");
+
+    // ⚠️ IMPORTANTE: WS precisa do server HTTP (Render-safe)
+    createWSS(server);
+
     console.log("WS ON");
 });

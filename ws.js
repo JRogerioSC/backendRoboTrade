@@ -1,35 +1,36 @@
 const WebSocket = require('ws');
 
-const wss = new WebSocket.Server({
-    server
-})
+let wss;
 
-// ======================
-// CONNECTION
-// ======================
+// cria websocket ligado ao servidor HTTP
+function createWSS(server) {
 
-wss.on('connection', (ws) => {
-
-    console.log('Frontend conectado');
-
-    ws.send(JSON.stringify({
-        status: "CONNECTED"
-    }));
-
-    ws.on('close', () => {
-        console.log('Frontend desconectou');
+    wss = new WebSocket.Server({
+        server
     });
 
-    ws.on('error', (err) => {
-        console.log('WS CLIENT ERROR:', err.message);
+    wss.on('connection', (ws) => {
+
+        console.log('Frontend conectado');
+
+        ws.send(JSON.stringify({
+            status: "CONNECTED"
+        }));
+
+        ws.on('close', () => {
+            console.log('Frontend desconectou');
+        });
+
+        ws.on('error', (err) => {
+            console.log('WS CLIENT ERROR:', err.message);
+        });
     });
-});
+}
 
-// ======================
-// BROADCAST
-// ======================
-
+// broadcast global
 function broadcast(data) {
+
+    if (!wss) return;
 
     const message = JSON.stringify(data);
 
@@ -42,12 +43,12 @@ function broadcast(data) {
             }
 
         } catch (err) {
-
             console.log('WS ERROR:', err.message);
         }
     });
 }
 
 module.exports = {
-    broadcast
+    broadcast,
+    createWSS
 };

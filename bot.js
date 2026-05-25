@@ -18,93 +18,54 @@ const exchange = new ccxt.bybit({
 const symbol = 'BTC/USDT';
 
 let position = null;
-
 let prices = [];
-
-// ======================
-// BOT LOOP
-// ======================
 
 async function bot() {
 
     try {
 
         const ticker = await exchange.fetchTicker(symbol);
-
         const price = ticker.last;
 
         prices.push(price);
-
-        if (prices.length > 50) {
-            prices.shift();
-        }
+        if (prices.length > 50) prices.shift();
 
         const decision = aiDecision(prices);
 
         let action = "WAITING";
-
         let profit = 0;
-
-        // ======================
-        // BUY
-        // ======================
 
         if (!position && decision === "BUY") {
 
-            position = {
-                entryPrice: price
-            };
-
+            position = { entryPrice: price };
             action = "BUY";
 
             console.log("BUY", price);
         }
-
-        // ======================
-        // POSITION
-        // ======================
 
         if (position) {
 
             profit = price - position.entryPrice;
 
             const tp = calcTP(position.entryPrice);
-
             const sl = calcSL(position.entryPrice);
-
-            // ======================
-            // TAKE PROFIT
-            // ======================
 
             if (price >= tp) {
 
                 action = "SELL_TP";
-
                 console.log("TAKE PROFIT");
-
                 position = null;
             }
-
-            // ======================
-            // STOP LOSS
-            // ======================
 
             else if (price <= sl) {
 
                 action = "SELL_SL";
-
                 console.log("STOP LOSS");
-
                 position = null;
             }
         }
 
-        // ======================
-        // SEND FRONTEND
-        // ======================
-
         broadcast({
-            status: "ON",
             price,
             action,
             position,
@@ -120,14 +81,9 @@ async function bot() {
         });
 
     } catch (err) {
-
         console.log("BOT ERROR:", err.message);
     }
 }
-
-// ======================
-// START LOOP
-// ======================
 
 setInterval(bot, 2000);
 
