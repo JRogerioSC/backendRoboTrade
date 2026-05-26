@@ -6,15 +6,18 @@ const { aiDecision } = require('./ai');
 const { calcTP, calcSL } = require('./risk');
 const { broadcast } = require('./ws');
 
-const exchange = new ccxt.bybit({
+// ======================
+// BINANCE
+// ======================
+
+const exchange = new ccxt.binance({
     apiKey: process.env.API_KEY,
     secret: process.env.API_SECRET,
 
     enableRateLimit: true,
 
     options: {
-        defaultType: 'spot',
-        adjustForTimeDifference: false
+        adjustForTimeDifference: true
     }
 });
 
@@ -22,30 +25,6 @@ const symbol = 'BTC/USDT';
 
 let position = null;
 let prices = [];
-let marketsLoaded = false;
-
-// ======================
-// LOAD MARKETS
-// ======================
-
-async function initMarkets() {
-
-    try {
-
-        if (!marketsLoaded) {
-
-            await exchange.loadMarkets();
-
-            marketsLoaded = true;
-
-            console.log('MARKETS LOADED');
-        }
-
-    } catch (err) {
-
-        console.log('LOAD MARKETS ERROR:', err.message);
-    }
-}
 
 // ======================
 // BOT
@@ -55,20 +34,27 @@ async function bot() {
 
     try {
 
-        // carrega mercados apenas 1x
-        if (!marketsLoaded) {
-            await initMarkets();
-        }
+        // ======================
+        // PREÇO
+        // ======================
 
         const ticker = await exchange.fetchTicker(symbol);
 
         const price = ticker.last;
+
+        // ======================
+        // HISTÓRICO
+        // ======================
 
         prices.push(price);
 
         if (prices.length > 50) {
             prices.shift();
         }
+
+        // ======================
+        // IA
+        // ======================
 
         const decision = aiDecision(prices);
 
@@ -81,6 +67,13 @@ async function bot() {
         // ======================
 
         if (!position && decision === "BUY") {
+
+            // ORDEM REAL
+
+            await exchange.createMarketBuyOrder(
+                symbol,
+                0.001
+            );
 
             position = {
                 entryPrice: price
@@ -103,7 +96,14 @@ async function bot() {
 
             const sl = calcSL(position.entryPrice);
 
+            // TAKE PROFIT
+
             if (price >= tp) {
+
+                await exchange.createMarketSellOrder(
+                    symbol,
+                    0.001
+                );
 
                 action = "SELL_TP";
 
@@ -112,7 +112,14 @@ async function bot() {
                 position = null;
             }
 
+            // STOP LOSS
+
             else if (price <= sl) {
+
+                await exchange.createMarketSellOrder(
+                    symbol,
+                    0.001
+                );
 
                 action = "SELL_SL";
 
@@ -123,7 +130,7 @@ async function bot() {
         }
 
         // ======================
-        // SEND FRONTEND
+        // FRONTEND
         // ======================
 
         broadcast({
@@ -146,6 +153,10 @@ async function bot() {
         console.log("BOT ERROR:", err.message);
     }
 }
+
+// ======================
+// LOOP
+// ======================
 
 setInterval(bot, 2000);
 
