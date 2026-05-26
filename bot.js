@@ -18,43 +18,51 @@ const exchange = new ccxt.bybit({
     }
 });
 
-// ======================
-// EVITA CHAMADAS PRIVADAS
-// ======================
-
-exchange.loadMarkets = async () => { };
-
-const symbol = 'BTCUSDT';
+const symbol = 'BTC/USDT';
 
 let position = null;
 let prices = [];
+let marketsLoaded = false;
 
 // ======================
-// BOT LOOP
+// LOAD MARKETS
+// ======================
+
+async function initMarkets() {
+
+    try {
+
+        if (!marketsLoaded) {
+
+            await exchange.loadMarkets();
+
+            marketsLoaded = true;
+
+            console.log('MARKETS LOADED');
+        }
+
+    } catch (err) {
+
+        console.log('LOAD MARKETS ERROR:', err.message);
+    }
+}
+
+// ======================
+// BOT
 // ======================
 
 async function bot() {
 
     try {
 
-        // ======================
-        // TICKER PUBLICO V5
-        // ======================
+        // carrega mercados apenas 1x
+        if (!marketsLoaded) {
+            await initMarkets();
+        }
 
-        const ticker =
-            await exchange.publicGetV5MarketTickers({
-                category: 'spot',
-                symbol
-            });
+        const ticker = await exchange.fetchTicker(symbol);
 
-        const price =
-            parseFloat(
-                ticker.result.list[0].lastPrice
-            );
-
-        // ======================
-        // HISTORICO
-        // ======================
+        const price = ticker.last;
 
         prices.push(price);
 
@@ -62,13 +70,10 @@ async function bot() {
             prices.shift();
         }
 
-        // ======================
-        // IA
-        // ======================
-
         const decision = aiDecision(prices);
 
         let action = "WAITING";
+
         let profit = 0;
 
         // ======================
@@ -92,18 +97,11 @@ async function bot() {
 
         if (position) {
 
-            profit =
-                price - position.entryPrice;
+            profit = price - position.entryPrice;
 
-            const tp =
-                calcTP(position.entryPrice);
+            const tp = calcTP(position.entryPrice);
 
-            const sl =
-                calcSL(position.entryPrice);
-
-            // ======================
-            // TAKE PROFIT
-            // ======================
+            const sl = calcSL(position.entryPrice);
 
             if (price >= tp) {
 
@@ -113,10 +111,6 @@ async function bot() {
 
                 position = null;
             }
-
-            // ======================
-            // STOP LOSS
-            // ======================
 
             else if (price <= sl) {
 
@@ -149,16 +143,9 @@ async function bot() {
 
     } catch (err) {
 
-        console.log(
-            "BOT ERROR:",
-            err.message
-        );
+        console.log("BOT ERROR:", err.message);
     }
 }
-
-// ======================
-// START LOOP
-// ======================
 
 setInterval(bot, 2000);
 

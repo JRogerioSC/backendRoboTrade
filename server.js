@@ -2,9 +2,11 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+
+require('./bot');
 
 const { broadcast, createWSS } = require('./ws');
-require('./bot');
 
 const app = express();
 
@@ -14,8 +16,18 @@ app.use(express.json());
 let botStatus = "OFF";
 
 // ======================
+// HTTP SERVER
+// ======================
+
+const server = http.createServer(app);
+
+// inicia websocket
+createWSS(server);
+
+// ======================
 // START BOT
 // ======================
+
 app.post('/start', (req, res) => {
 
     botStatus = "ON";
@@ -35,6 +47,7 @@ app.post('/start', (req, res) => {
 // ======================
 // STOP BOT
 // ======================
+
 app.post('/stop', (req, res) => {
 
     botStatus = "OFF";
@@ -54,19 +67,20 @@ app.post('/stop', (req, res) => {
 // ======================
 // STATUS
 // ======================
+
 app.get('/status', (req, res) => {
-    res.json({ status: botStatus });
+
+    res.json({
+        status: botStatus
+    });
 });
 
 // ======================
-// START SERVER + WS
+// SERVER
 // ======================
-const server = app.listen(3001, () => {
+
+server.listen(3001, () => {
 
     console.log("API ON 3001");
-
-    // ⚠️ IMPORTANTE: WS precisa do server HTTP (Render-safe)
-    createWSS(server);
-
-    console.log("WS ON");
+    console.log("WS ON 3001");
 });
