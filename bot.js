@@ -11,14 +11,16 @@ const { broadcast } = require('./ws');
 // ======================
 
 const exchange = new ccxt.bybit({
-    apiKey: process.env.BYBIT_API_KEY,
-    secret: process.env.BYBIT_API_SECRET,
+    apiKey: process.env.API_KEY,
+    secret: process.env.API_SECRET,
 
     enableRateLimit: true,
 
     options: {
-        defaultType: 'spot', // spot primeiro (mais estável)
-    }
+        defaultType: 'spot',
+    },
+
+    testnet: true,
 });
 
 const symbol = 'BTC/USDT';
@@ -26,34 +28,34 @@ const symbol = 'BTC/USDT';
 let position = null;
 let prices = [];
 
+let marketsLoaded = false;
+let minAmount = 0.001;
+
+// 🔥 TRAVA DE EXECUÇÃO (evita spam de ordem)
+let isProcessing = false;
+
 // ======================
 // BOT
 // ======================
 
 async function bot() {
 
+    if (isProcessing) return; // evita duplicação
+
+    isProcessing = true;
+
     try {
 
-        // ======================
-        // PREÇO
-        // ======================
-
-        const ticker = await exchange.fetchTicker(symbol);
-        const price = ticker.last;
-
-        // ======================
-        // HISTÓRICO
-        // ======================
-
-        prices.push(price);
-
-        if (prices.length > 50) {
-            prices.shift();
+        if (!marketsLoaded) {
+            const markets = await exchange.loadMarkets();
+            minAmount = markets[symbol]?.limits?.amount?.min || 0.001;
+            marketsLoaded = true;
         }
 
-        // ======================
-        // IA
-        // ======================
+        const ticker = await exchange.fetchTicker(symbol);
+        const price = ticker.last + (Math.random() * 2 - 1);
+        prices.push(price);
+        if (prices.length > 50) prices.shift();
 
         const decision = aiDecision(prices);
 
@@ -61,12 +63,21 @@ async function bot() {
         let profit = 0;
 
         // ======================
-        // BUY
+        // BUY (AUTO)
         // ======================
 
         if (!position && decision === "BUY") {
 
-            const amount = 0.001;
+            const ticker = await exchange.fetchTicker(symbol);
+            const price = ticker.last;
+
+            // mínimo em USDT (valor da ordem)
+            const minUSDT = 10; // normalmente 5 ou 10 na Bybit spot
+
+            let amount = minUSDT / price;
+
+            // ajuste para evitar erro de precisão
+            amount = parseFloat(amount.toFixed(6));
 
             await exchange.createMarketBuyOrder(symbol, amount);
 
@@ -76,12 +87,11 @@ async function bot() {
             };
 
             action = "BUY";
-
-            console.log("BUY", price);
+            console.log("BUY", price, amount);
         }
 
         // ======================
-        // POSITION
+        // POSITION MANAGEMENT
         // ======================
 
         if (position) {
@@ -99,7 +109,7 @@ async function bot() {
                 action = "SELL_TP";
                 position = null;
 
-                console.log("TAKE PROFIT");
+                console.log("TAKE PROFIT EXECUTED");
             }
 
             // STOP LOSS
@@ -110,13 +120,9 @@ async function bot() {
                 action = "SELL_SL";
                 position = null;
 
-                console.log("STOP LOSS");
+                console.log("STOP LOSS EXECUTED");
             }
         }
-
-        // ======================
-        // FRONTEND
-        // ======================
 
         broadcast({
             price,
@@ -126,22 +132,19 @@ async function bot() {
             decision
         });
 
-        console.log({
-            price,
-            action,
-            position,
-            profit
-        });
+        console.log({ price, action, position, profit });
 
     } catch (err) {
         console.log("BOT ERROR:", err.message);
     }
+
+    isProcessing = false;
 }
 
 // ======================
-// LOOP
+// LOOP (AUTO TRADING)
 // ======================
 
-setInterval(bot, 2000);
+setInterval(bot, 500);
 
 console.log("BYBIT BOT RUNNING");

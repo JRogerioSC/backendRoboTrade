@@ -1,18 +1,16 @@
 function aiDecision(prices) {
 
-    if (!prices || prices.length < 5) {
+    if (!prices || prices.length < 20) {
         return "HOLD";
     }
 
-    const last = prices.slice(-5);
+    const last = prices.slice(-20);
 
     const first = last[0];
     const lastPrice = last[last.length - 1];
 
-    // tendência
     const trend = (lastPrice - first) / first;
 
-    // volatilidade
     let volatility = 0;
 
     for (let i = 1; i < last.length; i++) {
@@ -21,24 +19,13 @@ function aiDecision(prices) {
 
     volatility = volatility / last.length;
 
-    console.log({
-        trend,
-        volatility
-    });
+    console.log({ trend, volatility });
 
-    // =========================
-    // IA MAIS FLEXÍVEL
-    // =========================
-
-    if (trend > 0.0001) {
-        return "BUY";
-    }
-
-    if (trend < -0.0001) {
-        return "SELL";
-    }
+    if (trend > 0.000005) return "BUY";
+    if (trend < -0.000005) return "SELL";
 
     return "HOLD";
 }
 
+// 🔥 ISSO AQUI É O IMPORTANTE
 module.exports = { aiDecision };
