@@ -7,17 +7,17 @@ const { calcTP, calcSL } = require('./risk');
 const { broadcast } = require('./ws');
 
 // ======================
-// BINANCE
+// BYBIT
 // ======================
 
-const exchange = new ccxt.binance({
-    apiKey: process.env.API_KEY,
-    secret: process.env.API_SECRET,
+const exchange = new ccxt.bybit({
+    apiKey: process.env.BYBIT_API_KEY,
+    secret: process.env.BYBIT_API_SECRET,
 
     enableRateLimit: true,
 
     options: {
-        adjustForTimeDifference: true
+        defaultType: 'spot', // spot primeiro (mais estável)
     }
 });
 
@@ -39,7 +39,6 @@ async function bot() {
         // ======================
 
         const ticker = await exchange.fetchTicker(symbol);
-
         const price = ticker.last;
 
         // ======================
@@ -59,7 +58,6 @@ async function bot() {
         const decision = aiDecision(prices);
 
         let action = "WAITING";
-
         let profit = 0;
 
         // ======================
@@ -68,15 +66,13 @@ async function bot() {
 
         if (!position && decision === "BUY") {
 
-            // ORDEM REAL
+            const amount = 0.001;
 
-            await exchange.createMarketBuyOrder(
-                symbol,
-                0.001
-            );
+            await exchange.createMarketBuyOrder(symbol, amount);
 
             position = {
-                entryPrice: price
+                entryPrice: price,
+                amount
             };
 
             action = "BUY";
@@ -93,39 +89,28 @@ async function bot() {
             profit = price - position.entryPrice;
 
             const tp = calcTP(position.entryPrice);
-
             const sl = calcSL(position.entryPrice);
 
             // TAKE PROFIT
-
             if (price >= tp) {
 
-                await exchange.createMarketSellOrder(
-                    symbol,
-                    0.001
-                );
+                await exchange.createMarketSellOrder(symbol, position.amount);
 
                 action = "SELL_TP";
+                position = null;
 
                 console.log("TAKE PROFIT");
-
-                position = null;
             }
 
             // STOP LOSS
-
             else if (price <= sl) {
 
-                await exchange.createMarketSellOrder(
-                    symbol,
-                    0.001
-                );
+                await exchange.createMarketSellOrder(symbol, position.amount);
 
                 action = "SELL_SL";
+                position = null;
 
                 console.log("STOP LOSS");
-
-                position = null;
             }
         }
 
@@ -149,7 +134,6 @@ async function bot() {
         });
 
     } catch (err) {
-
         console.log("BOT ERROR:", err.message);
     }
 }
@@ -160,4 +144,4 @@ async function bot() {
 
 setInterval(bot, 2000);
 
-console.log("AI BOT RUNNING");
+console.log("BYBIT BOT RUNNING");
